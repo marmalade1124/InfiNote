@@ -461,6 +461,15 @@ export const Dashboard: React.FC = () => {
                                             </button>
                                         </div>
                                     </div>
+                                    
+                                    {/* Debug Info (Temporary) */}
+                                    <div className="mt-8 p-4 bg-black/20 rounded text-[10px] font-mono text-zinc-600">
+                                        <p>DEBUG INFO:</p>
+                                        <p>ID: {user?.id}</p>
+                                        <p>Email: {user?.email}</p>
+                                        <p>Role: {user?.role || 'undefined'}</p>
+                                        <p>DB Username: {dbUsername}</p>
+                                    </div>
                                 </div>
                             </div>
                         )}
