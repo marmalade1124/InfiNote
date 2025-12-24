@@ -14,7 +14,7 @@ import { useParams } from 'react-router-dom';
 // Wrapper for Canvas to include UI
 const CanvasPage = () => {
     const { id } = useParams();
-    const { loadBoard, resetCanvas, savedBoards } = useCanvasStore();
+    const { loadBoard, resetCanvas } = useCanvasStore();
 
     useEffect(() => {
         if (id) {

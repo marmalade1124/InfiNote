@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCanvasStore } from '../store/canvasStore';
-import { MousePointer2, Hand, StickyNote, Image, Pencil, Type, Eraser, Trash, Palette, X } from 'lucide-react';
+import { MousePointer2, Hand, StickyNote, Image, Pencil, Type, Eraser, Trash, X } from 'lucide-react';
 
 export const Toolbar: React.FC = () => {
     const { addNote, interactionMode, setInteractionMode, selectedNoteIds } = useCanvasStore();
