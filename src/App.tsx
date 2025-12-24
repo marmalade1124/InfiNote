@@ -1,0 +1,89 @@
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Login } from './pages/Login';
+import { Dashboard } from './pages/Dashboard';
+import { InfiniteCanvas } from './components/InfiniteCanvas';
+import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
+import { Minimap } from './components/Minimap';
+import { useCanvasStore } from './store/canvasStore';
+import { useAuthStore } from './store/authStore';
+
+import { useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+
+// Wrapper for Canvas to include UI
+const CanvasPage = () => {
+    const { id } = useParams();
+    const { loadBoard, resetCanvas, savedBoards } = useCanvasStore();
+
+    useEffect(() => {
+        if (id) {
+            // Always fetch fresh data to ensure we have the latest
+            loadBoard(id); 
+            // If it fails, loadBoard handles the error state
+        } else {
+            resetCanvas();
+        }
+    }, [id, loadBoard, resetCanvas]);
+
+    return (
+        <div className="h-screen w-full flex flex-col overflow-hidden bg-background-dark text-white font-display">
+          <Header boardId={id} />
+          <main className="relative flex-1 overflow-hidden group/canvas">
+            <Sidebar />
+            <InfiniteCanvas />
+            <Minimap />
+          </main>
+        </div>
+    );
+};
+
+// Protected Route Wrapper
+const RequireAuth = ({ children }: { children: React.ReactNode }) => {
+    const { session, isLoading } = useAuthStore();
+    const location = useLocation();
+
+    if (isLoading) {
+        return <div className="h-screen w-full flex items-center justify-center bg-background-dark text-white">Loading...</div>;
+    }
+
+    if (!session) {
+        return <Navigate to="/" state={{ from: location }} replace />;
+    }
+
+    return children;
+};
+
+function App() {
+  const { initialize } = useAuthStore();
+
+  useEffect(() => {
+      initialize();
+  }, [initialize]);
+
+  return (
+    <Router>
+        <Routes>
+            <Route path="/" element={<Login />} />
+            <Route 
+                path="/dashboard" 
+                element={
+                    <RequireAuth>
+                        <Dashboard />
+                    </RequireAuth>
+                } 
+            />
+            <Route 
+                path="/editor/:id" 
+                element={
+                    <RequireAuth>
+                        <CanvasPage />
+                    </RequireAuth>
+                } 
+            />
+        </Routes>
+    </Router>
+  );
+}
+
+export default App;
