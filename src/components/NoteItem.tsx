@@ -145,6 +145,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({ note, onConnectStart, onConn
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                    onBlur={handleSave}
                     autoFocus={focusTarget === 'title'}
                  />
             ) : (
