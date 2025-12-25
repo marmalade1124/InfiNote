@@ -143,7 +143,7 @@ interface CanvasStore {
   };
   undo: () => void;
   redo: () => void;
-  pushHistory: () => void;
+  // pushHistory removed (duplicate)
   
   // Cleanup: Replaced complex savedBoards object with simple array for dashboard
   savedBoards: { id: string; title: string; lastModified: number; isPublic: boolean }[];
@@ -162,7 +162,13 @@ interface CanvasStore {
   currentUser: { name: string; email: string; id: string } | null;
   login: (email: string) => void;
   logout: () => void;
-// ... (keep middle section unchanged, just skipping to implementation) ...
+  
+  // Realtime & Drawings
+  drawings: Drawing[];
+  subscribeToBoard: (boardId: string) => void;
+  pushHistory: () => void;
+}
+
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
       boardId: null,
       notes: [],
@@ -175,6 +181,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       savedBoards: [], // Now a simple array
       currentUser: null,
       isReadOnly: false,
+      activeBoardIsPublic: false,
       
       status: 'connected',
       error: null,
@@ -325,8 +332,40 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
           // Start Realtime Subscription
           get().subscribeToBoard(id);
       },
-      
-      // ... subscribeToBoard unchanged ...
+
+      subscribeToBoard: (boardId) => {
+          console.log("Subscribing to board:", boardId);
+          // Realtime subscription logic
+          const channel = supabase.channel(`board:${boardId}`)
+          .on('postgres_changes', 
+              { event: '*', schema: 'public', filter: `board_id=eq.${boardId}`, table: 'notes' },
+              (payload) => {
+                  console.log('Realtime update:', payload);
+                  // In a full implementation, we would merge changes here.
+                  // For now, we rely on manual refresh or implemented optimistic updates.
+              }
+          )
+          .subscribe();
+      },
+
+      pushHistory: () => {
+          const state = get();
+          const currentSnapshot = JSON.stringify({
+              notes: state.notes,
+              connections: state.connections,
+              drawings: state.drawings
+          });
+          
+          const newPast = [...state.history.past, currentSnapshot];
+          if (newPast.length > 50) newPast.shift();
+
+          set({
+              history: {
+                  past: newPast,
+                  future: []
+              }
+          });
+      },
 
       fetchBoardsList: async () => { 
            const { data: boards } = await supabase
