@@ -169,15 +169,30 @@ interface CanvasStore {
   deselectAll: () => void;
   deleteSelectedNotes: () => void;
   updateSelectedNotesColor: (color: Note['color']) => void;
+  setSearchQuery: (query: string) => void;
+  setViewState: (view: Partial<ViewState>) => void;
+  
+  // Viewport
+  pan: (dx: number, dy: number) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
   
   // Notes
   addNote: (note: Omit<Note, 'id'>) => void;
   updateNote: (id: string, updates: Partial<Note>) => void;
+  moveNote: (id: string, x: number, y: number) => void;
+  moveNotes: (ids: string[], dx: number, dy: number) => void;
   deleteNote: (id: string) => void;
   duplicateNote: (id: string) => void;
   bringToFront: (id: string) => void;
   sendToBack: (id: string) => void;
   disconnectNote: (id: string) => void;
+
+  // Connections
+  addConnection: (connection: Connection) => void;
+  updateConnection: (id: string, updates: Partial<Connection>) => void;
+  deleteConnection: (id: string) => void;
+  selectConnection: (id: string | null) => void;
 
   // Categories
   addCategory: (name: string, color: string) => void;
@@ -187,6 +202,8 @@ interface CanvasStore {
   
   // Realtime & Drawings
   drawings: Drawing[];
+  addDrawing: (drawing: Drawing) => void;
+  deleteDrawing: (id: string) => void;
   subscribeToBoard: (boardId: string) => void;
   pushHistory: () => void;
 }
@@ -200,7 +217,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       selectedNoteIds: [],
       selectedConnectionId: null,
       history: { past: [], future: [] },
-      savedBoards: [], // Now a simple array
+      savedBoards: [], 
       currentUser: null,
       isReadOnly: false,
       activeBoardIsPublic: false,
@@ -218,6 +235,79 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
           { name: 'Research', color: '#eab308' }  
       ],
       drawings: [],
+
+      setSearchQuery: (query) => set({ searchQuery: query }),
+      setViewState: (view) => set((state) => ({ view: { ...state.view, ...view } })),
+
+      pan: (dx, dy) => set((state) => ({ view: { ...state.view, x: state.view.x + dx, y: state.view.y + dy } })),
+      zoomIn: () => set((state) => ({ view: { ...state.view, zoom: Math.min(state.view.zoom * 1.2, 5) } })),
+      zoomOut: () => set((state) => ({ view: { ...state.view, zoom: Math.max(state.view.zoom / 1.2, 0.1) } })),
+
+      addConnection: async (connection) => {
+          const state = get();
+          get().pushHistory();
+          set({ connections: [...state.connections, connection] });
+          if (state.boardId) {
+              await supabase.from('connections').insert({
+                  id: connection.id,
+                  board_id: state.boardId,
+                  from_id: connection.fromId,
+                  to_id: connection.toId,
+                  source_handle: connection.sourceHandle,
+                  target_handle: connection.targetHandle,
+                  type: connection.type,
+                  color: connection.color,
+                  stroke_width: connection.strokeWidth
+              });
+          }
+      },
+      
+      updateConnection: async (id, updates) => {
+          const state = get();
+          set({ connections: state.connections.map(c => c.id === id ? { ...c, ...updates } : c) });
+          if (state.boardId) {
+              await supabase.from('connections').update({ 
+                  color: updates.color, 
+                  type: updates.type, 
+                  stroke_width: updates.strokeWidth 
+              }).eq('id', id);
+          }
+      },
+
+      deleteConnection: async (id) => {
+          const state = get();
+          get().pushHistory();
+          set({ connections: state.connections.filter((c) => c.id !== id) });
+          if (state.boardId) {
+              await supabase.from('connections').delete().eq('id', id);
+          }
+      },
+
+      selectConnection: (id) => set({ selectedConnectionId: id, selectedNoteIds: [] }),
+
+      addDrawing: async (drawing) => {
+          const state = get();
+          get().pushHistory(); 
+          set({ drawings: [...state.drawings, drawing] });
+          if (state.boardId) {
+               await supabase.from('drawings').insert({
+                   id: drawing.id,
+                   board_id: state.boardId,
+                   points: drawing.points,
+                   color: drawing.color,
+                   stroke_width: drawing.strokeWidth
+               });
+          }
+      },
+      
+      deleteDrawing: async (id) => {
+          const state = get();
+          get().pushHistory();
+          set({ drawings: state.drawings.filter(d => d.id !== id) });
+          if (state.boardId) {
+              await supabase.from('drawings').delete().eq('id', id);
+          }
+      },
 
       setInteractionMode: (mode) => set({ interactionMode: mode }),
       
@@ -298,6 +388,32 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
              // But for now, direct update is fine if calls are not too frequent
              await supabase.from('notes').update(updates).eq('id', id);
           }
+      },
+      
+      moveNote: async (id, x, y) => {
+          set((state) => ({
+              notes: state.notes.map(n => n.id === id ? { ...n, x, y } : n)
+          }));
+          const state = get();
+          if (state.boardId) {
+              await supabase.from('notes').update({ x, y }).eq('id', id);
+          }
+      },
+      
+      moveNotes: async (ids, dx, dy) => {
+           set((state) => ({
+                notes: state.notes.map(n => ids.includes(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)
+           }));
+           // Debouncing suggested for real app
+           const state = get();
+           if (state.boardId) {
+               for (const id of ids) {
+                   const note = state.notes.find(n => n.id === id);
+                   if (note) {
+                       await supabase.from('notes').update({ x: note.x, y: note.y }).eq('id', id);
+                   }
+               }
+           }
       },
 
       deleteNote: async (id) => {
@@ -515,7 +631,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       subscribeToBoard: (boardId) => {
           console.log("Subscribing to board:", boardId);
           // Realtime subscription logic
-          const channel = supabase.channel(`board:${boardId}`)
+          supabase.channel(`board:${boardId}`)
           .on('postgres_changes', 
               { event: '*', schema: 'public', filter: `board_id=eq.${boardId}`, table: 'notes' },
               (payload) => {

@@ -103,7 +103,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({ note, onConnectStart, onConn
       dragMomentum={false}
       onDragEnd={(_, info) => {
         if (isSelected && selectedNoteIds.length > 0) {
-            moveNotes(info.offset.x, info.offset.y);
+            moveNotes(selectedNoteIds, info.offset.x, info.offset.y);
         } else {
             moveNote(note.id, note.x + info.offset.x, note.y + info.offset.y);
         }

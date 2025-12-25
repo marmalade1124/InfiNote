@@ -193,7 +193,16 @@ export const InfiniteCanvas: React.FC = () => {
 
     const handleConnectEnd = (id: string, handle: 'left' | 'right', _e: React.MouseEvent) => {
         if (connectingFrom && connectingFrom.id !== id) {
-            addConnection(connectingFrom.id, id, connectingFrom.handle, handle);
+            addConnection({
+                id: crypto.randomUUID(),
+                fromId: connectingFrom.id,
+                toId: id,
+                sourceHandle: connectingFrom.handle,
+                targetHandle: handle,
+                type: 'curve',
+                color: '#6b7280',
+                strokeWidth: 2
+            });
             setConnectingFrom(null);
         }
     };

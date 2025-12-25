@@ -107,6 +107,25 @@ export const Toolbar: React.FC = () => {
                     <Image size={24} />
                 </button>
                 <div className="w-px h-6 bg-gray-700 mx-1"></div>
+
+                <button 
+                  onClick={async () => {
+                      if (boardId) {
+                          const newStatus = !activeBoardIsPublic;
+                          await togglePublic(boardId, newStatus);
+                          if (newStatus) {
+                             navigator.clipboard.writeText(window.location.href);
+                             // Visual feedback is handled by button state, alert as fallback
+                          }
+                      }
+                  }}
+                  className={`p-3 rounded-full transition-all flex items-center justify-center transform active:scale-95 ${activeBoardIsPublic ? 'bg-green-600 text-white shadow-[0_0_15px_rgba(22,163,74,0.5)]' : 'text-gray-400 hover:text-white hover:bg-white/10'}`} 
+                  title={activeBoardIsPublic ? "Public (Click to make Private)" : "Private (Click to Share)"}
+                >
+                    <Share2 size={24} />
+                </button>
+                
+                <div className="w-px h-6 bg-gray-700 mx-1"></div>
                 <button 
                   onClick={async () => {
                       // Manual Save Trigger
