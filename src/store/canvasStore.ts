@@ -163,6 +163,28 @@ interface CanvasStore {
   login: (email: string) => void;
   logout: () => void;
   
+  // Interaction
+  setInteractionMode: (mode: 'select' | 'pan' | 'draw' | 'text' | 'connect' | 'eraser') => void;
+  selectNote: (id: string, multi?: boolean) => void;
+  deselectAll: () => void;
+  deleteSelectedNotes: () => void;
+  updateSelectedNotesColor: (color: Note['color']) => void;
+  
+  // Notes
+  addNote: (note: Omit<Note, 'id'>) => void;
+  updateNote: (id: string, updates: Partial<Note>) => void;
+  deleteNote: (id: string) => void;
+  duplicateNote: (id: string) => void;
+  bringToFront: (id: string) => void;
+  sendToBack: (id: string) => void;
+  disconnectNote: (id: string) => void;
+
+  // Categories
+  addCategory: (name: string, color: string) => void;
+  setActiveCategory: (name: string | null) => void;
+  removeCategory: (name: string) => void;
+  updateCategoryColor: (name: string, color: string) => void;
+  
   // Realtime & Drawings
   drawings: Drawing[];
   subscribeToBoard: (boardId: string) => void;
@@ -196,6 +218,163 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
           { name: 'Research', color: '#eab308' }  
       ],
       drawings: [],
+
+      setInteractionMode: (mode) => set({ interactionMode: mode }),
+      
+      selectNote: (id, multi = false) => {
+          if (multi) {
+              set((state) => ({ 
+                  selectedNoteIds: state.selectedNoteIds.includes(id) 
+                      ? state.selectedNoteIds.filter(nid => nid !== id)
+                      : [...state.selectedNoteIds, id]
+              }));
+          } else {
+              set({ selectedNoteIds: [id] });
+          }
+      },
+      
+      deselectAll: () => set({ selectedNoteIds: [], selectedConnectionId: null }),
+      
+      deleteSelectedNotes: async () => {
+          const state = get();
+          get().pushHistory();
+          
+          const idsToDelete = state.selectedNoteIds;
+          if (idsToDelete.length === 0) return;
+
+          // Optimistic UI update
+          set({ 
+              notes: state.notes.filter(n => !idsToDelete.includes(n.id)),
+              connections: state.connections.filter(c => !idsToDelete.includes(c.fromId) && !idsToDelete.includes(c.toId)),
+              selectedNoteIds: []
+          });
+
+          // DB Sync
+          if (state.boardId) {
+             const { error } = await supabase.from('notes').delete().in('id', idsToDelete);
+             if (error) console.error("Error deleting notes:", error);
+          }
+      },
+      
+      updateSelectedNotesColor: async (color) => {
+          const state = get();
+          get().pushHistory();
+          
+          const ids = state.selectedNoteIds;
+          set({
+              notes: state.notes.map(n => ids.includes(n.id) ? { ...n, color } : n)
+          });
+          
+          if (state.boardId) {
+              await supabase.from('notes').update({ color }).in('id', ids);
+          }
+      },
+
+      addNote: async (noteData) => {
+          const state = get();
+          get().pushHistory();
+          
+          const newNote: Note = {
+              id: crypto.randomUUID(),
+              ...noteData
+          };
+          
+          set({ notes: [...state.notes, newNote] });
+          
+          if (state.boardId) {
+              await supabase.from('notes').insert({ ...newNote, board_id: state.boardId });
+          }
+      },
+
+      updateNote: async (id, updates) => {
+          // No history push for every keystroke/drag, usually debounced or onEnd
+          set((state) => ({
+              notes: state.notes.map(n => n.id === id ? { ...n, ...updates } : n)
+          }));
+          
+          const state = get();
+          if (state.boardId) {
+             // For frequent updates, we might want to debounce this or rely on a "save" trigger
+             // But for now, direct update is fine if calls are not too frequent
+             await supabase.from('notes').update(updates).eq('id', id);
+          }
+      },
+
+      deleteNote: async (id) => {
+          const state = get();
+          get().pushHistory();
+          
+          set({ 
+              notes: state.notes.filter(n => n.id !== id),
+              connections: state.connections.filter(c => c.fromId !== id && c.toId !== id)
+          });
+          
+          if (state.boardId) {
+              await supabase.from('notes').delete().eq('id', id);
+          }
+      },
+      
+      duplicateNote: async (id) => {
+          const state = get();
+          const noteToDuplicate = state.notes.find(n => n.id === id);
+          if (!noteToDuplicate) return;
+          
+          get().pushHistory();
+          
+          const newNote = {
+              ...noteToDuplicate,
+              id: crypto.randomUUID(),
+              x: noteToDuplicate.x + 20,
+              y: noteToDuplicate.y + 20,
+              title: `${noteToDuplicate.title} (Copy)`
+          };
+          
+          set({ notes: [...state.notes, newNote] });
+          
+          if (state.boardId) {
+              await supabase.from('notes').insert({ ...newNote, board_id: state.boardId });
+          }
+      },
+
+      bringToFront: (id) => {
+           set(state => {
+               const index = state.notes.findIndex(n => n.id === id);
+               if (index === -1 || index === state.notes.length - 1) return state;
+               const newNotes = [...state.notes];
+               const [note] = newNotes.splice(index, 1);
+               newNotes.push(note);
+               return { notes: newNotes };
+           });
+      },
+
+      sendToBack: (id) => {
+          set(state => {
+               const index = state.notes.findIndex(n => n.id === id);
+               if (index === -1 || index === 0) return state;
+               const newNotes = [...state.notes];
+               const [note] = newNotes.splice(index, 1);
+               newNotes.unshift(note);
+               return { notes: newNotes };
+           });
+      },
+      
+      disconnectNote: async (id) => {
+           const state = get();
+           get().pushHistory();
+           set({ 
+               connections: state.connections.filter(c => c.fromId !== id && c.toId !== id)
+           });
+           // DB sync for connections is handled by syncDiff or we should add explicit delete
+           // Ideally we should delete specific connections from DB
+           if (state.boardId) {
+               await supabase.from('connections').delete().or(`from_id.eq.${id},to_id.eq.${id}`);
+           }
+      },
+
+      addCategory: (name, color) => set(state => ({ categories: [...state.categories, { name, color }] })),
+      setActiveCategory: (name) => set({ activeCategory: name }),
+      removeCategory: (name) => set(state => ({ categories: state.categories.filter(c => c.name !== name) })),
+      updateCategoryColor: (name, color) => set(state => ({ categories: state.categories.map(c => c.name === name ? { ...c, color } : c) })),
 
       
       login: async (email) => {
