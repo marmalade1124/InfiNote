@@ -630,7 +630,18 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
       subscribeToBoard: (boardId) => {
           console.log("Subscribing to board:", boardId);
-          set({ status: 'connecting' });
+          // If we are already connected (from loadBoard), don't flash 'connecting'
+          if (get().status !== 'connected') {
+             set({ status: 'connecting' });
+          }
+
+          // Cleanup existing channels for this board to prevent duplicates
+          const existingChannels = supabase.getChannels();
+          existingChannels.forEach(ch => {
+              if (ch.topic === `realtime:board:${boardId}`) {
+                  supabase.removeChannel(ch);
+              }
+          });
           
           // Realtime subscription logic
           supabase.channel(`board:${boardId}`)
@@ -638,16 +649,18 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
               { event: '*', schema: 'public', filter: `board_id=eq.${boardId}`, table: 'notes' },
               (payload) => {
                   console.log('Realtime update:', payload);
-                  // In a full implementation, we would merge changes here.
+                  // Handle payload...
               }
           )
           .subscribe((status) => {
+              console.log(`Subscription status for ${boardId}:`, status);
               if (status === 'SUBSCRIBED') {
-                  set({ status: 'connected' });
+                  set({ status: 'connected', error: null });
               } else if (status === 'CLOSED') {
-                  set({ status: 'disconnected' });
+                  // Only set disconnected if we were not intentionally closing
+                  //set({ status: 'disconnected' }); 
               } else if (status === 'CHANNEL_ERROR') {
-                  set({ status: 'disconnected', error: 'Connection Error' });
+                  set({ status: 'disconnected', error: 'Realtime Connection Error' });
               } else if (status === 'TIMED_OUT') {
                   set({ status: 'disconnected', error: 'Connection Timed Out' });
               }
