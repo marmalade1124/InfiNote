@@ -210,7 +210,7 @@ export const Dashboard: React.FC = () => {
                                 {/* Greeting */}
                                 <div className="space-y-1 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                      <h1 className="text-3xl font-display font-bold tracking-tight text-white mb-2">Welcome back, {displayName}</h1>
-                                     <p className="text-zinc-400">Your infinite canvas awaits. You have <span className="text-white font-medium">{Object.keys(savedBoards).length || 0} boards</span> saved.</p>
+                                    <p className="text-zinc-400">Your infinite canvas awaits. You have <span className="text-white font-medium">{savedBoards.length || 0} boards</span> saved.</p>
                                 </div>
 
                                 {/* Recent Section */}
@@ -242,7 +242,7 @@ export const Dashboard: React.FC = () => {
                                         </button>
 
                                         {/* Saved Boards List */}
-                                        {Object.values(savedBoards || {}).map((board) => (
+                                        {savedBoards.map((board) => (
                                             <div 
                                                 key={board.id}
                                                 onClick={() => navigate(`/editor/${board.id}`)}
@@ -260,6 +260,14 @@ export const Dashboard: React.FC = () => {
                                                 >
                                                     <span className="material-symbols-outlined text-[16px]">delete</span>
                                                 </button>
+                                                
+                                                {/* Public Badge */}
+                                                {board.isPublic && (
+                                                    <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-emerald-500/20 text-emerald-500 text-[10px] font-bold uppercase tracking-wider rounded border border-emerald-500/30">
+                                                        Public
+                                                    </div>
+                                                )}
+
                                                 {/* Preview Area */}
                                                 <div className="h-2/3 bg-[#09090b] border-b border-zinc-800 relative group-hover:bg-[#0c0c0e] transition-colors flex items-center justify-center">
                                                      <div className="flex gap-2 opacity-50 grayscale group-hover:grayscale-0 transition-all duration-500 scale-90 group-hover:scale-100">
@@ -270,7 +278,7 @@ export const Dashboard: React.FC = () => {
                                                 {/* Footer */}
                                                 <div className="p-4">
                                                     <h4 className="font-display font-semibold text-white text-sm group-hover:text-indigo-400 transition-colors truncate">{board.title || 'Untitled Board'}</h4>
-                                                    <p className="text-xs text-zinc-500 mt-1">{board.notes.length} objects • {new Date(board.lastModified).toLocaleDateString()}</p>
+                                                    <p className="text-xs text-zinc-500 mt-1">{new Date(board.lastModified).toLocaleDateString()}</p>
                                                 </div>
                                             </div>
                                         ))}

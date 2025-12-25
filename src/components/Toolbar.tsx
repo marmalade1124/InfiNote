@@ -1,9 +1,9 @@
 import React from 'react';
 import { useCanvasStore } from '../store/canvasStore';
-import { MousePointer2, Hand, StickyNote, Image, Pencil, Type, Eraser, Trash, X } from 'lucide-react';
+import { MousePointer2, Hand, StickyNote, Image, Pencil, Type, Eraser, Trash, X, Share2 } from 'lucide-react';
 
 export const Toolbar: React.FC = () => {
-    const { addNote, interactionMode, setInteractionMode, selectedNoteIds } = useCanvasStore();
+    const { addNote, interactionMode, setInteractionMode, selectedNoteIds, boardId, activeBoardIsPublic, togglePublic } = useCanvasStore();
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const selectedCount = selectedNoteIds.length;
 
