@@ -630,6 +630,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
       subscribeToBoard: (boardId) => {
           console.log("Subscribing to board:", boardId);
+          set({ status: 'connecting' });
+          
           // Realtime subscription logic
           supabase.channel(`board:${boardId}`)
           .on('postgres_changes', 
@@ -637,10 +639,19 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
               (payload) => {
                   console.log('Realtime update:', payload);
                   // In a full implementation, we would merge changes here.
-                  // For now, we rely on manual refresh or implemented optimistic updates.
               }
           )
-          .subscribe();
+          .subscribe((status) => {
+              if (status === 'SUBSCRIBED') {
+                  set({ status: 'connected' });
+              } else if (status === 'CLOSED') {
+                  set({ status: 'disconnected' });
+              } else if (status === 'CHANNEL_ERROR') {
+                  set({ status: 'disconnected', error: 'Connection Error' });
+              } else if (status === 'TIMED_OUT') {
+                  set({ status: 'disconnected', error: 'Connection Timed Out' });
+              }
+          });
       },
 
       pushHistory: () => {

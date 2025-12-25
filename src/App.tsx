@@ -61,6 +61,31 @@ function App() {
       initialize();
   }, [initialize]);
 
+  const { setStatus } = useCanvasStore();
+
+  useEffect(() => {
+      const handleOnline = () => {
+          console.log("Browser Online");
+          // Optionally trigger reconnect logic if needed
+          setStatus('connecting');
+          // Re-connection usually handled by Supabase client auto-reconnect, 
+          // but updating UI status immediately is good.
+      };
+      
+      const handleOffline = () => {
+          console.log("Browser Offline");
+          setStatus('disconnected');
+      };
+
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+
+      return () => {
+          window.removeEventListener('online', handleOnline);
+          window.removeEventListener('offline', handleOffline);
+      };
+  }, [setStatus]);
+
   return (
     <Router>
         <Routes>
